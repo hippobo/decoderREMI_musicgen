@@ -1,0 +1,54 @@
+<html>
+
+<head>
+    <title>MIDI Writer</title>
+    <script
+        src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/focus-visible@5,npm/html-midi-player@1.5.0"></script>
+
+</head>
+
+<body>
+
+
+    <midi-player id="player" src="" sound-font>
+    </midi-player>
+
+    <midi-visualizer type="piano-roll" id="v_roll" src="">
+    </midi-visualizer>
+
+    <midi-visualizer type="staff" id="v_staff" src="">
+    </midi-visualizer>
+
+</body>
+</html>
+
+
+<script type="module">
+    import midiWriterJs from "https://cdn.skypack.dev/midi-writer-js@2.1.4";
+
+    const track = new midiWriterJs.Track();
+
+    track.addEvent(new midiWriterJs.ProgramChangeEvent({ instrument: 1 }));
+    track.setTempo(125, 0)
+
+    const notes = ["C4", "G4", "F4", "F4", "F4", "E4", "F4", "G4"]
+
+    for (let i = 0; i < notes.length; i++) {
+        const n = notes[i]
+        const e = new midiWriterJs.NoteEvent({ pitch: n, duration: '4' })
+        track.addEvent(e);
+    }
+
+    const write = new midiWriterJs.Writer(track);
+
+    let player = document.getElementById("player")
+    let v_staff = document.getElementById("v_staff")
+    let v_roll = document.getElementById("v_roll")
+
+    player.src = write.dataUri()
+    v_staff.src = write.dataUri()
+    v_roll.src = write.dataUri()
+
+    player.addVisualizer(v_staff);
+    player.addVisualizer(v_roll);
+</script>

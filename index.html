@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MIDI Sequence Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+
+        #content{
+            color :#000
+        }
+
+        body {
+            background-color: #ffffff;
+            color: #ffffff;
+        }
+         h1, h2 {
+            color: #333;
+        }
+                /* Custom player style */
+
+
+        #section3 midi-player {
+        display: block;
+        width: inherit;
+        margin: 4px;
+        margin-bottom: 0;
+        }
+        #section3 midi-player::part(control-panel) {
+        background: #ff5;
+        border: 2px solid #000;
+        border-radius: 10px 10px 0 0;
+        }
+        #section3 midi-player::part(play-button) {
+        color: #353;
+        border: 2px solid currentColor;
+        background-color: #4d4;
+        border-radius: 20px;
+        transition: all 0.2s;
+        content: 'hello';
+        }
+        #section3 midi-player::part(play-button):hover {
+        color: #0a0;
+        background-color: #5f5;
+        border-radius: 10px;
+        }
+        #section3 midi-player::part(time) {
+        font-family: monospace;
+        }
+
+        /* Custom visualizer style */
+        #section3 midi-visualizer .piano-roll-visualizer {
+        background: #ffd;
+        border: 2px solid black;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        margin: 4px;
+        margin-top: 0;
+        overflow: auto;
+        }
+        #section3 midi-visualizer svg rect.note {
+        opacity: 0.6;
+        stroke-width: 2;
+        }
+        #section3 midi-visualizer svg rect.note[data-instrument="0"]{
+        fill: #e22;
+        stroke: #500;
+        }
+        #section3 midi-visualizer svg rect.note[data-instrument="2"]{
+        fill: #2ee;
+        stroke: #055;
+        }
+        #section3 midi-visualizer svg rect.note[data-is-drum="true"]{
+        fill: #888;
+        stroke: #888;
+        }
+        #section3 midi-visualizer svg rect.note.active {
+        opacity: 0.9;
+        stroke: #000;
+        }
+
+            </style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@magenta/music@^1.0.0"></script>
+
+<script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/focus-visible@5,npm/html-midi-player@1.5.0"></script>
+<!-- <script src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/focus-visible@5,npm/html-midi-player@1.5.0"></script> -->
+
+
+
+</head>
+
+<body>
+
+    <div>
+        <input type="file" id="midiFileInput" accept=".mid,.midi" />
+    </div>
+    
+
+
+    <h2>MIDI sequence generator</h2>
+    <!-- <midi-player
+      id = "player"
+      src=""
+      sound-font visualizer="#section3 midi-visualizer">
+    </midi-player>
+    <midi-visualizer
+    id ="v_roll"
+      src="https://cdn.jsdelivr.net/gh/cifkao/html-midi-player@2b12128/jazz.mid">
+    </midi-visualizer> -->
+<!-- 
+<midi-visualizer type="piano-roll" id="v_staf"></midi-visualizer> -->
+
+   
+    <midi-player id="player" src="" sound-font>
+    </midi-player>
+
+    <midi-visualizer type="piano-roll" id="v_roll" src="">
+    </midi-visualizer>
+
+    <midi-visualizer type="staff" id="v_staff" src="">
+    </midi-visualizer>
+
+
+
+
+<div>
+    <input type="number" id="maxValueInput" placeholder="Enter maximum value" />
+    <button id="generateButton">Generate Next Token</button>
+    <button id="clearContextButton">Clear Context</button>
+    <div id="generatedSequence"></div>
+    <button id="generateMidiButton">Generate MIDI</button>
+
+</div>
+
+<div id="content">
+    <span id="text"></span>
+    <span id="carret" class="text-black animate-ping">|</span>
+  </div>
+
+
+
+
+
+<script type="module">
+
+import midiWriterJs from "https://cdn.skypack.dev/midi-writer-js@2.1.4";
+
+import tokenizer_encode from './tokenizer_js_encode.json' assert { type: 'json' };
+import tokenizer_decode from './tokenizer_js_decode.json' assert { type: 'json' };
+
+
+
+let block_size = 1;
+let globalContext = ['Position_0'];
+
+
+// let seq = "PIECE_START STYLE=JSFAKES GENRE=JSFAKES TRACK_START INST=48 BAR_START NOTE_ON=67 TIME_DELTA=4 NOTE_OFF=67 NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=72 TIME_DELTA=4 NOTE_OFF=72 NOTE_ON=69 TIME_DELTA=4 NOTE_OFF=69 BAR_END BAR_START NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=65 TIME_DELTA=2 NOTE_OFF=65 NOTE_ON=67 TIME_DELTA=2 NOTE_OFF=67 NOTE_ON=65 TIME_DELTA=8 NOTE_OFF=65 BAR_END BAR_START NOTE_ON=66 TIME_DELTA=4 NOTE_OFF=66 NOTE_ON=67 TIME_DELTA=4 NOTE_OFF=67 NOTE_ON=67 TIME_DELTA=4 NOTE_OFF=67 NOTE_ON=65 TIME_DELTA=4 NOTE_OFF=65 BAR_END BAR_START NOTE_ON=65 TIME_DELTA=8 NOTE_OFF=65 NOTE_ON=64 TIME_DELTA=8 NOTE_OFF=64 BAR_END TRACK_END TRACK_START INST=0 BAR_START NOTE_ON=75 TIME_DELTA=4 NOTE_OFF=75 NOTE_ON=77 TIME_DELTA=4 NOTE_OFF=77 NOTE_ON=77 TIME_DELTA=4 NOTE_OFF=77 NOTE_ON=75 TIME_DELTA=4 NOTE_OFF=75 BAR_END BAR_START NOTE_ON=74 TIME_DELTA=2 NOTE_OFF=74 NOTE_ON=72 TIME_DELTA=2 NOTE_OFF=72 NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=69 TIME_DELTA=8 NOTE_OFF=69 BAR_END BAR_START NOTE_ON=69 TIME_DELTA=4 NOTE_OFF=69 NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=72 TIME_DELTA=4 NOTE_OFF=72 NOTE_ON=69 TIME_DELTA=4 NOTE_OFF=69 BAR_END BAR_START NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=68 TIME_DELTA=4 NOTE_OFF=68 NOTE_ON=67 TIME_DELTA=8 NOTE_OFF=67 BAR_END TRACK_END TRACK_START INST=32 BAR_START NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=58 TIME_DELTA=4 NOTE_OFF=58 NOTE_ON=57 TIME_DELTA=4 NOTE_OFF=57 NOTE_ON=53 TIME_DELTA=4 NOTE_OFF=53 BAR_END BAR_START NOTE_ON=58 TIME_DELTA=4 NOTE_OFF=58 NOTE_ON=50 TIME_DELTA=2 NOTE_OFF=50 NOTE_ON=51 TIME_DELTA=2 NOTE_OFF=51 NOTE_ON=53 TIME_DELTA=8 NOTE_OFF=53 BAR_END BAR_START NOTE_ON=50 TIME_DELTA=4 NOTE_OFF=50 NOTE_ON=55 TIME_DELTA=2 NOTE_OFF=55 NOTE_ON=53 TIME_DELTA=2 NOTE_OFF=53 NOTE_ON=52 TIME_DELTA=4 NOTE_OFF=52 NOTE_ON=53 TIME_DELTA=2 NOTE_OFF=53 NOTE_ON=41 TIME_DELTA=2 NOTE_OFF=41 BAR_END BAR_START NOTE_ON=46 TIME_DELTA=4 NOTE_OFF=46 NOTE_ON=47 TIME_DELTA=4 NOTE_OFF=47 NOTE_ON=48 TIME_DELTA=8 NOTE_OFF=48 BAR_END TRACK_END TRACK_START INST=24 BAR_START NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=65 TIME_DELTA=4 NOTE_OFF=65 BAR_END BAR_START NOTE_ON=65 TIME_DELTA=2 NOTE_OFF=65 NOTE_ON=63 TIME_DELTA=2 NOTE_OFF=63 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=8 NOTE_OFF=60 BAR_END BAR_START NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 BAR_END BAR_START NOTE_ON=62 TIME_DELTA=2 NOTE_OFF=62 NOTE_ON=63 TIME_DELTA=2 NOTE_OFF=63 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=8 NOTE_OFF=60 BAR_END TRACK_END PIECE_END";
+// let token_array = seq.split(" ");
+// console.log(token_array);
+
+// const midi = tokenSequenceToNoteSequence(token_array, 120.0, true, true, null, false);
+
+
+
+function remiTokensToMidi(tokens, ticksPerSample) {
+    let track = new midiWriterJs.Track();
+
+    let currentTick = 0;
+    let tickAtCurrentBar = 0;
+    let currentProgram = 0;
+    let currentDuration = 'T120';
+    let currentVelocity = 50;
+
+    tokens.forEach(tokenGroup => {
+        tokenGroup.forEach(token => {
+            let [tokenType, tokenValue] = token.split('_');
+
+            switch (tokenType) {
+                case 'Pitch':
+                const note = new midiWriterJs.NoteEvent({
+                        pitch: [tokenValue],
+                        duration: currentDuration,
+                        // startTick: currentTick,
+                        velocity: currentVelocity
+                    });
+                    track.addEvent(note);
+                    break;
+                case 'Velocity':
+                currentVelocity = parseInt(tokenValue);
+                    break;
+                    case 'Duration':
+                    
+                    let [beat, pos, res] = tokenValue.split('.').map(Number);
+                    let durationInTicks = (beat * res + pos) * ticksPerSample / res;
+                    currentDuration = 'T' + (durationInTicks);
+                    break;
+                case 'Position':
+                currentTick = (tickAtCurrentBar) + parseInt(tokenValue) * ticksPerSample;
+                console.log(ticksPerSample)
+                    break;
+                            case 'Program':
+                let programNumber = parseInt(tokenValue);
+                // Check if program number is within the valid range
+                if (programNumber < 0 || programNumber > 127) {
+                    console.warn(`Invalid program number: ${programNumber}. Defaulting to 0 (Piano).`);
+                    programNumber = 0; // Default to Piano or another instrument of your choice
+                }
+                currentProgram = programNumber;
+                track.addEvent(new midiWriterJs.ProgramChangeEvent({instrument: currentProgram}));
+                break;
+                case 'Chord':
+                    break
+                
+            }
+        });
+    });
+
+    // Convert the track to a MIDI file
+    let write = new midiWriterJs.Writer([track]);
+    return write.buildFile();
+}
+
+
+
+const text = document.getElementById("text")
+      const display = (token) => {
+        globalContext.push(token);
+        text.innerHTML = globalContext
+    
+       
+        
+      }
+      const clearContext = () => {
+        globalContext = ['Position_0'];  // Reset the context
+        text.innerHTML = '';  // Clear the display
+    }
+
+
+
+
+
+
+
+
+function decode(tokenIds) {
+
+return tokenIds.map(id => tokenizer_decode[id]).join('');
+}
+
+function encode(tokens) {
+    
+    return tokens.map(text => 
+        tokenizer_encode[text] !== undefined ? tokenizer_encode[text] : 3 // 3 for unknown tokens
+    );
+}
+
+const softmax = (logits, temperature) => {
+        const exps = logits.map((value) => Math.exp(value / temperature))
+        const sumExps = exps.reduce((acc, val) => acc + val)
+        return exps.map((exp) => exp / sumExps)
+      }
+
+const multinomial = (probas, topK) => {
+const choices = probas.map((w, i) => ({ w, i })).sort((a, b) => b.w - a.w)
+const weights = choices.slice(0, topK).map((c) => c.w)
+const total = weights.reduce((a, c) => a += c)
+const num = Math.random()
+let sum = 0
+for (let weight of weights) {
+    sum += weight / total
+    if (num < sum) return choices.filter(({ w, i }) => w === weight)[0].i
+}
+return choices.filter(({ w, i }) => w === weights[-1])[0].i
+}
+
+const generate = async (session, ctx, ctxSize, temperature, topK) => {
+
+        const idxs = encode(ctx).slice(-ctxSize)
+        const input = new ort.Tensor('int64', idxs, [1, idxs.length])
+        console.log(input)
+        const result = await session.run({ 'input': input })
+        const output = [...result.output.data]
+        const logits = output.slice(-output.length / idxs.length)
+        const idx = multinomial(softmax(logits, temperature), topK)
+        ctx = decode([...idxs.slice(-ctxSize + 1), idx])
+        
+        display(decode([idx]))
+}
+    
+      
+
+
+const write = async () => {
+    const maxValue = parseInt(document.getElementById('maxValueInput').value);
+    const session = await ort.InferenceSession.create('models/musicgen.onnx');
+    const ctxSize = block_size;
+    const temperature = 1.0;
+    const topK = 100;
+    
+    while (true) {
+        await generate(session, globalContext, ctxSize, temperature, topK);
+        const currentValue = globalContext.length;
+        if (currentValue >= maxValue) break;
+    }
+};
+
+
+
+function updateMidiSource() {
+    var input = document.getElementById('midiFileInput');
+    var file = input.files[0];
+    if (file) {
+        var reader = new FileReader();
+
+        reader.onload = function(e) {
+            var midiPlayer = document.querySelector('midi-player');
+            var midiVisualizer = document.querySelector('midi-visualizer');
+
+            midiPlayer.src = e.target.result;
+            midiVisualizer.src = e.target.result;
+
+            midiPlayer.stop();
+            midiPlayer.start();
+        };
+
+        reader.readAsDataURL(file);
+    }
+}
+
+document.getElementById('generateButton').addEventListener('click', write);
+document.getElementById('clearContextButton').addEventListener('click', clearContext);
+document.getElementById('midiFileInput').addEventListener('change', updateMidiSource);
+
+document.getElementById('generateMidiButton').addEventListener('click', async () => {
+    // Generate the MIDI file from tokens
+    let ticksPerSample = 480;
+   let midiFile = remiTokensToMidi([['Pitch_35'],['Velocity_95'],['Duration_0.1.8'],['Program_35'],['Pitch_51'],['Velocity_103'],['Duration_0.1.8'],['Position_8'],['Program_-1'],['Pitch_54'],['Velocity_95'],['Duration_0.1.8'],['Program_33'],['Pitch_38'],['Velocity_71'],['Duration_0.1.8'],['Program_0'],['Pitch_49'],['Velocity_119'],['Duration_0.1.8'],['Program_25'],['Pitch_69'],['Velocity_111'],['Duration_0.4.8'],['Program_38'],['Pitch_46'],['Velocity_119'],['Duration_0.3.8'],['Program_2'],['Pitch_65'],['Velocity_79'],['Duration_0.7.8'],['Program_39'],['Pitch_68'],['Velocity_119'],['Duration_0.2.8'],['Position_24'],['Program_75'],['Pitch_62'],['Velocity_127'],['Duration_0.4.8'],['Program_0'],['Pitch_60'],['Velocity_63'],['Duration_0.4.8'],['Program_-1'],['Pitch_49'],['Velocity_63'],['Duration_0.2.8'],['Position_3'],['Program_32'],['Pitch_28'],['Velocity_111'],['Duration_0.4.8'],['Position_4'],['Program_-1'],['Pitch_54'],['Velocity_39'],['Duration_1.5.8'],['Program_28'],['Pitch_59'],['Velocity_31'],['Duration_0.3.8'],['Program_25'],['Pitch_62'],['Velocity_103'],['Duration_0.4.8'],['Program_53'],['Pitch_68'],['Velocity_63'],['Duration_0.3.8'],['Program_-1'],['Pitch_36'],['Velocity_127'],['Duration_0.6.8'],['Program_5'],['Pitch_62'],['Velocity_79'],['Duration_0.3.8'],['Position_11'],['Program_73'],['Pitch_69'],['Velocity_47'],['Duration_0.2.8'],['Position_26'],['Program_0'],['Pitch_81'],['Velocity_87'],['Duration_0.3.8'],['Program_25'],['Pitch_82'],['Velocity_119'],['Duration_1.1.8'],['Program_1'],['Pitch_55'],['Velocity_63'],['Duration_0.1.8'],['Program_-1'],['Pitch_54'],['Velocity_7'],['Duration_0.2.8'],['Program_53'],['Pitch_66'],['Velocity_127'],['Duration_0.3.8'],['Program_33'],['Pitch_47'],['Velocity_95'],['Duration_0.1.8'],['Position_14'],['Program_52'],['Pitch_54'],['Velocity_119'],['Duration_0.3.8'],['Program_-1'],['Pitch_51'],['Velocity_95'],['Duration_0.3.8'],['Position_4'],['Program_-1'],['Pitch_61'],['Velocity_103'],['Duration_1.4.8'],['Program_-1'],['Pitch_46'],['Velocity_71'],['Duration_1.7.8'],['Program_25'],['Pitch_64'],['Velocity_79'],['Duration_0.2.8'],['Position_6'],['Program_48'],['Pitch_60'],['Velocity_111'],['Duration_0.1.8'],['Program_-1'],['Pitch_42'],['Velocity_79'],['Duration_0.1.8'],['Program_-1'],['Pitch_42'],['Velocity_103'],['Duration_0.3.8'],['Bar_None'],['Bar_None'],['Bar_None'],['Bar_None'],['Bar_None']], ticksPerSample);
+
+    // Convert the MIDI file to a Blob
+    let midiBlob = new Blob([midiFile], {type: 'audio/midi'});
+
+    // Create a data URL from the Blob
+    let midiURL = URL.createObjectURL(midiBlob);
+
+    // Load and set the generated MIDI file to the MIDI player and visualizer
+    document.querySelector('midi-player').src = midiURL;
+    document.querySelector('midi-visualizer').src = midiURL;
+
+    // Start playing the MIDI file
+    document.querySelector('midi-player').stop();
+    document.querySelector('midi-player').start();
+});
+
+
+
+</script>
+
+
+
+
+</body>
+
+
+</html>
