@@ -4,71 +4,76 @@
     <meta charset="UTF-8">
     <title>MIDI Sequence Generator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <style>
-html, body {
-    height: 100%;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Arial', sans-serif; /* Use a web-safe font */
-}
-
-#section1,
-#content {
-    width: 100%; /* Full width */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-midi-player,
-midi-visualizer {
-    width: 800px;  /* Set a fixed width */
-    height: 180px; /* Set a fixed height */
-    margin: 20px auto; /* Center the element with automatic horizontal margins */
-}
-
-/* Style for the text where tokens are displayed */
-#text {
-    font-size: 1.2em;
-    color: #000;
-    margin: 20px 0; /* Spacing above and below */
-}
-
-/* Style for inputs and buttons */
-input[type="number" ],
-button {
-    font-size: 1.2em;
-    margin: 10px;
-    padding: 10px 20px; /* Larger clickable area */
-}
-
-h1, h2 {
-    font-size: 2em;
-    color: #333;
-}
-
-
-/* Add a class for the tokens for easier styling */
-.token {
-    font-size: 1em; /* Larger than the rest of the text */
-    margin: 0 5px; /* Space out tokens */
-}
-         h1, h2 {
-            color: #333;
-            font-size: 3em;
+        html, body {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Arial', sans-serif;
         }
-                /* Custom player style */
 
+        #section1, #content, #controls {
+            width: 90%; /* Responsive width */
+            max-width: 800px; /* Maximum width */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 10px auto;
+        }
 
-      
-       
+        midi-player, midi-visualizer {
+            width: 100%; /* Responsive width */
+            max-width: 800px;
+            height: 180px;
+            margin: 10px 0;
+        }
 
-            </style>
+        #text {
+            font-size: 1.2em;
+            color: #000;
+            margin: 10px 0;
+            word-break: break-word; /* Prevents overflow on small screens */
+        }
 
+        input[type="number"], button, input[type="checkbox"] {
+            font-size: 1.2em;
+            margin: 5px;
+            padding: 10px 20px;
+        }
+
+        h1, h2 {
+            font-size: 2em;
+            color: #333;
+        }
+
+        .token {
+            font-size: 1em;
+            margin: 0 5px;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin: 10px;
+        }
+
+        .checkbox-label {
+            margin-left: 5px;
+        }
+
+        @media (max-width: 600px) {
+            h1, h2 {
+                font-size: 1.5em;
+            }
+
+            #text {
+                font-size: 1em;
+            }
+        }
+    </style>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 
@@ -86,54 +91,31 @@ h1, h2 {
         <input type="file" id="midiFileInput" accept=".mid,.midi" />
     </div>
     
+    <section id="section1">
+        <h1>MIDI Sequence Generator</h1>
+        <midi-player src="https://cdn.jsdelivr.net/gh/cifkao/html-midi-player@2b12128/twinkle_twinkle.mid" sound-font visualizer="#section1 midi-visualizer"></midi-player>
+        <midi-visualizer id="player" type="piano-roll" src="https://cdn.jsdelivr.net/gh/cifkao/html-midi-player@2b12128/twinkle_twinkle.mid"></midi-visualizer>
+    </section>
 
-<section id="section1">
-    <h1>MIDI sequence generator</h1>
-    <!-- <midi-player
-      id = "player"
-      src=""
-      sound-font visualizer="#section3 midi-visualizer">
-    </midi-player>
-    <midi-visualizer
-    id ="v_roll"
-      src="https://cdn.jsdelivr.net/gh/cifkao/html-midi-player@2b12128/jazz.mid">
-    </midi-visualizer> -->
+    <div id="controls">
+        <input type="number" id="maxValueInput" placeholder="Enter Sequence Length" step="10" />
+        <div class="checkbox-container">
+            <input type="checkbox" id="pianoOnlyCheckbox">
+            <label for="pianoOnlyCheckbox" class="checkbox-label">Piano Only</label>
+        </div>
+        <button id="generateButton">Generate MIDI Sequence</button>
+        <button id="clearContextButton">Clear Context</button>
+        <button id="downloadButton" style="display: none;">Download MIDI File</button>
+    </div>
 
+    <div id="content">
+        <span id="text"></span>
+        <span id="carret" class="text-black animate-ping">|</span>
+    </div>
 
-    <midi-player
-    src="https://cdn.jsdelivr.net/gh/cifkao/html-midi-player@2b12128/twinkle_twinkle.mid"
-    sound-font visualizer="#section1 midi-visualizer">
-  </midi-player>
-
-<midi-visualizer
-id = "player"
-  type="piano-roll"
-  src="https://cdn.jsdelivr.net/gh/cifkao/html-midi-player@2b12128/twinkle_twinkle.mid">
-</midi-visualizer>
 
 
  
-  
-
-
-</section>
-
-
-
-
-<div>
-    <input type="number" id="maxValueInput" placeholder="Enter Sequence Length" step="10" />
-
-    <button id="generateButton">Generate MIDI Sequence</button>
-    <button id="clearContextButton">Clear Context</button>
-    
-
-</div>
-
-<div id="content">
-    <span id="text"></span>
-    <span id="carret" class="text-black animate-ping">|</span>
-  </div>
 
 
 
@@ -146,42 +128,54 @@ import midiWriterJs from "https://cdn.skypack.dev/midi-writer-js@2.1.4";
 import tokenizer_encode from './tokenizer_js_encode.json' assert { type: 'json' };
 import tokenizer_decode from './tokenizer_js_decode.json' assert { type: 'json' };
 
+const pianoOnlyCheckbox = document.getElementById('pianoOnlyCheckbox');
+let isPianoOnly = false;
+
+pianoOnlyCheckbox.addEventListener('change', () => {
+    isPianoOnly = pianoOnlyCheckbox.checked;
+});
 
 
-let block_size = 128;
+const downloadButton = document.getElementById('downloadButton');
+let midiBlob; 
+
+
+let block_size = 256;
 console.log("ctx size: ", block_size);
 let globalContext = ['Position_0'];
 
 
-// let seq = "PIECE_START STYLE=JSFAKES GENRE=JSFAKES TRACK_START INST=48 BAR_START NOTE_ON=67 TIME_DELTA=4 NOTE_OFF=67 NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=72 TIME_DELTA=4 NOTE_OFF=72 NOTE_ON=69 TIME_DELTA=4 NOTE_OFF=69 BAR_END BAR_START NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=65 TIME_DELTA=2 NOTE_OFF=65 NOTE_ON=67 TIME_DELTA=2 NOTE_OFF=67 NOTE_ON=65 TIME_DELTA=8 NOTE_OFF=65 BAR_END BAR_START NOTE_ON=66 TIME_DELTA=4 NOTE_OFF=66 NOTE_ON=67 TIME_DELTA=4 NOTE_OFF=67 NOTE_ON=67 TIME_DELTA=4 NOTE_OFF=67 NOTE_ON=65 TIME_DELTA=4 NOTE_OFF=65 BAR_END BAR_START NOTE_ON=65 TIME_DELTA=8 NOTE_OFF=65 NOTE_ON=64 TIME_DELTA=8 NOTE_OFF=64 BAR_END TRACK_END TRACK_START INST=0 BAR_START NOTE_ON=75 TIME_DELTA=4 NOTE_OFF=75 NOTE_ON=77 TIME_DELTA=4 NOTE_OFF=77 NOTE_ON=77 TIME_DELTA=4 NOTE_OFF=77 NOTE_ON=75 TIME_DELTA=4 NOTE_OFF=75 BAR_END BAR_START NOTE_ON=74 TIME_DELTA=2 NOTE_OFF=74 NOTE_ON=72 TIME_DELTA=2 NOTE_OFF=72 NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=69 TIME_DELTA=8 NOTE_OFF=69 BAR_END BAR_START NOTE_ON=69 TIME_DELTA=4 NOTE_OFF=69 NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=72 TIME_DELTA=4 NOTE_OFF=72 NOTE_ON=69 TIME_DELTA=4 NOTE_OFF=69 BAR_END BAR_START NOTE_ON=70 TIME_DELTA=4 NOTE_OFF=70 NOTE_ON=68 TIME_DELTA=4 NOTE_OFF=68 NOTE_ON=67 TIME_DELTA=8 NOTE_OFF=67 BAR_END TRACK_END TRACK_START INST=32 BAR_START NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=58 TIME_DELTA=4 NOTE_OFF=58 NOTE_ON=57 TIME_DELTA=4 NOTE_OFF=57 NOTE_ON=53 TIME_DELTA=4 NOTE_OFF=53 BAR_END BAR_START NOTE_ON=58 TIME_DELTA=4 NOTE_OFF=58 NOTE_ON=50 TIME_DELTA=2 NOTE_OFF=50 NOTE_ON=51 TIME_DELTA=2 NOTE_OFF=51 NOTE_ON=53 TIME_DELTA=8 NOTE_OFF=53 BAR_END BAR_START NOTE_ON=50 TIME_DELTA=4 NOTE_OFF=50 NOTE_ON=55 TIME_DELTA=2 NOTE_OFF=55 NOTE_ON=53 TIME_DELTA=2 NOTE_OFF=53 NOTE_ON=52 TIME_DELTA=4 NOTE_OFF=52 NOTE_ON=53 TIME_DELTA=2 NOTE_OFF=53 NOTE_ON=41 TIME_DELTA=2 NOTE_OFF=41 BAR_END BAR_START NOTE_ON=46 TIME_DELTA=4 NOTE_OFF=46 NOTE_ON=47 TIME_DELTA=4 NOTE_OFF=47 NOTE_ON=48 TIME_DELTA=8 NOTE_OFF=48 BAR_END TRACK_END TRACK_START INST=24 BAR_START NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=65 TIME_DELTA=4 NOTE_OFF=65 BAR_END BAR_START NOTE_ON=65 TIME_DELTA=2 NOTE_OFF=65 NOTE_ON=63 TIME_DELTA=2 NOTE_OFF=63 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=8 NOTE_OFF=60 BAR_END BAR_START NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 NOTE_ON=60 TIME_DELTA=4 NOTE_OFF=60 BAR_END BAR_START NOTE_ON=62 TIME_DELTA=2 NOTE_OFF=62 NOTE_ON=63 TIME_DELTA=2 NOTE_OFF=63 NOTE_ON=62 TIME_DELTA=4 NOTE_OFF=62 NOTE_ON=60 TIME_DELTA=8 NOTE_OFF=60 BAR_END TRACK_END PIECE_END";
-// let token_array = seq.split(" ");
-// console.log(token_array);
-
-// const midi = tokenSequenceToNoteSequence(token_array, 120.0, true, true, null, false);
-
-
 function remiTokensToMidi(tokens, ticksPerSample) {
+    console.log(tokens)
     let track = new midiWriterJs.Track();
 
     let currentTick = 0;
-    let tickAtCurrentBar = 0;
-    let currentProgram = 0;
+    let currentProgram = isPianoOnly ? 0 : null; 
     let currentDuration = 'T120';
     let currentVelocity = 50;
 
     tokens.forEach(tokenGroup => {
+        let chordNotes = []; // Array to hold notes of a chord
+
         tokenGroup.forEach(token => {
             let [tokenType, tokenValue] = token.split('_');
 
             switch (tokenType) {
-                case 'Pitch':
+                case 'Pitch':                               
                     if (tokenValue !== null && !isNaN(tokenValue)) {
-                        const note = new midiWriterJs.NoteEvent({
-                            pitch: [tokenValue],
-                            duration: currentDuration,
-                            velocity: currentVelocity
-                        });
-                        track.addEvent(note);
+                        if (chordNotes.length) {
+                            // If we are in a chord, add note to the chord array
+                            chordNotes.push(tokenValue);
+                        } else {
+                            
+                            const note = new midiWriterJs.NoteEvent({
+                                pitch: [tokenValue],
+                                duration: currentDuration,
+                                velocity: currentVelocity
+                            });
+                            
+                            track.addEvent(note);
+                        }
                     }
                     break;
                 case 'Velocity':
@@ -193,30 +187,46 @@ function remiTokensToMidi(tokens, ticksPerSample) {
                     if (tokenValue) {
                         let [beat, pos, res] = tokenValue.split('.').map(Number);
                         let durationInTicks = (beat * res + pos) * ticksPerSample / res;
-                        currentDuration = 'T' + durationInTicks;
+                        currentDuration = 'T' + durationInTicks.toString();
                     }
                     break;
                 case 'Position':
                     if (!isNaN(parseInt(tokenValue))) {
-                        currentTick = (tickAtCurrentBar) + parseInt(tokenValue) * ticksPerSample;
+                        currentTick += parseInt(tokenValue) * ticksPerSample;
                     }
                     break;
-                case 'Program':
-                    let programNumber = parseInt(tokenValue);
-                    if (!isNaN(programNumber) && programNumber >= 0 && programNumber <= 127) {
-                        currentProgram = programNumber;
-                        track.addEvent(new midiWriterJs.ProgramChangeEvent({instrument: currentProgram}));
+                    case 'Program':
+                    if (!isPianoOnly) {
+                        let programNumber = parseInt(tokenValue);
+                        if (!isNaN(programNumber) && programNumber >= 0 && programNumber <= 127) {
+                            currentProgram = programNumber;
+                            track.addEvent(new midiWriterJs.ProgramChangeEvent({instrument: currentProgram}));
+                        }
                     }
                     break;
-                
+                case 'Chord':
+                    chordNotes = []; // Initialize the chord array
+                    break;
+                case 'ChordEnd':
+                    // Create chord notes
+                    const chord = new midiWriterJs.NoteEvent({
+                        pitch: chordNotes,
+                        duration: currentDuration,
+                        velocity: currentVelocity,
+                        startTick: currentTick
+                    });
+                    track.addEvent(chord);
+                    chordNotes = []; // Clear the chord array for the next chord
+                    break;
             }
         });
     });
 
     // Convert the track to a MIDI file
-    let write = new midiWriterJs.Writer([track]);
+    let write = new midiWriterJs.Writer(track);
     return write.buildFile();
 }
+
 
 
 
@@ -288,9 +298,10 @@ const generate = async (session, ctx, ctxSize, temperature, topK) => {
 
 
 const write = async () => {
+    
     const maxValue = parseInt(document.getElementById('maxValueInput').value);
-    if (maxValue < 1) return;
-    const session = await ort.InferenceSession.create('models/musicgen.onnx');
+    if (maxValue < 1 || maxValue == null || maxValue == " ") return;
+    const session = await ort.InferenceSession.create('models/musicgen2.onnx');
     const ctxSize = block_size;
     const temperature = 1.0;
     const topK = 100;
@@ -348,16 +359,35 @@ document.getElementById('clearContextButton').addEventListener('click', clearCon
 document.getElementById('midiFileInput').addEventListener('change', updateMidiSource);
 const tokenDisplay = document.getElementById("text");
 document.getElementById('generateButton').addEventListener('click', async () => {
-    // Generate the MIDI file from tokens
-    await write();
-    let ticksPerSample = 120;
+    const maxValueInput = document.getElementById('maxValueInput');
+    const maxValue = parseInt(maxValueInput.value, 10);
 
+    // Check if the input value is a number and greater than 0
+    if (isNaN(maxValue) || maxValue <= 0) {
+        // Alert the user to enter a valid sequence length
+        alert('Please enter a valid sequence length.');
+        maxValueInput.focus(); 
+        return; // Exit the function if no valid input
+    }
+
+    await write();
+    let ticksPerSample = 90;
+    // const flatTokens = ['Position_0', 'Program_0', 'Pitch_42', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_66', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_69', 'Velocity_119', 'Duration_2.1.8', 'Program_0', 'Pitch_74', 'Velocity_119', 'Duration_2.1.8', 'Program_0', 'Pitch_78', 'Velocity_119', 'Duration_2.1.8', 'Program_-1', 'Pitch_36', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_4', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_0.5.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_6', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_66', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_2.1.8', 'Program_-1', 'Pitch_40', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_12', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_16', 'Program_0', 'Pitch_45', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_66', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_95', 'Duration_1.1.8', 'Program_-1', 'Pitch_36', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_20', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_0.5.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_22', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_24', 'Program_0', 'Pitch_64', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_78', 'Velocity_119', 'Duration_1.1.8', 'Program_-1', 'Pitch_40', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_28', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_0.5.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_30', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Bar_None', 'Position_0', 'Program_0', 'Pitch_45', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_64', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_119', 'Duration_1.1.8', 'Program_0', 'Pitch_76', 'Velocity_119', 'Duration_1.1.8', 'Program_-1', 'Pitch_36', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_4', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_6', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_8', 'Program_0', 'Pitch_45', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_64', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_76', 'Velocity_119', 'Duration_1.1.8', 'Program_-1', 'Pitch_40', 'Velocity_95']
+    // const groupedTokens = [];
+
+    // for (let i = 0; i < flatTokens.length; i += 5) {
+    // const group = flatTokens.slice(i, i + 5);
+    // groupedTokens.push(group);
+// }
     displayTokenByToken(globalContext);
 
+//    let midiFile = remiTokensToMidi(groupedTokens, ticksPerSample);
    let midiFile = remiTokensToMidi([globalContext], ticksPerSample);
 
     // Convert the MIDI file to a Blob
-    let midiBlob = new Blob([midiFile], {type: 'audio/midi'});
+    midiBlob = new Blob([midiFile], {type: 'audio/midi'});
+
+    downloadButton.style.display = 'block';
 
     // Create a data URL from the Blob
     let midiURL = URL.createObjectURL(midiBlob);
@@ -369,6 +399,17 @@ document.getElementById('generateButton').addEventListener('click', async () => 
     // Start playing the MIDI file
     document.querySelector('midi-player').stop();
     document.querySelector('midi-player').start();
+});
+
+downloadButton.addEventListener('click', () => {
+    if (!midiBlob) return;
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = URL.createObjectURL(midiBlob);
+    downloadLink.download = 'generated_midi.mid';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
 });
 
 
