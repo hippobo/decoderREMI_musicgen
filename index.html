@@ -143,89 +143,86 @@ let midiBlob;
 let block_size = 256;
 console.log("ctx size: ", block_size);
 let globalContext = ['Position_0'];
-
-
-function remiTokensToMidi(tokens, ticksPerSample) {
-    console.log(tokens)
+function remiTokensToMidi(tokens, timeDivision, isPianoOnly) {
+    let ticksPerSample = timeDivision/8;
     let track = new midiWriterJs.Track();
-
+    track.setTempo(120);
+    track.setTimeSignature(4, 4);
     let currentTick = 0;
-    let currentProgram = isPianoOnly ? 0 : null; 
-    let currentDuration = 'T120';
-    let currentVelocity = 50;
+    let currentProgram = isPianoOnly ? 0 : null;
+    let currentVelocity = 50; // Default velocity, should be updated by Velocity tokens
 
     tokens.forEach(tokenGroup => {
-        let chordNotes = []; // Array to hold notes of a chord
-
-        tokenGroup.forEach(token => {
+        tokenGroup.forEach((token, index) => {
             let [tokenType, tokenValue] = token.split('_');
+            // console.log("token type: ", tokenType);
+            // console.log("index: ", index);
 
             switch (tokenType) {
-                case 'Pitch':                               
-                    if (tokenValue !== null && !isNaN(tokenValue)) {
-                        if (chordNotes.length) {
-                            // If we are in a chord, add note to the chord array
-                            chordNotes.push(tokenValue);
-                        } else {
-                            
-                            const note = new midiWriterJs.NoteEvent({
-                                pitch: [tokenValue],
-                                duration: currentDuration,
-                                velocity: currentVelocity
-                            });
-                            
-                            track.addEvent(note);
-                        }
-                    }
-                    break;
-                case 'Velocity':
-                    if (!isNaN(parseInt(tokenValue))) {
-                        currentVelocity = parseInt(tokenValue);
-                    }
-                    break;
-                case 'Duration':
-                    if (tokenValue) {
-                        let [beat, pos, res] = tokenValue.split('.').map(Number);
-                        let durationInTicks = (beat * res + pos) * ticksPerSample / res;
-                        currentDuration = 'T' + durationInTicks.toString();
-                    }
-                    break;
                 case 'Position':
                     if (!isNaN(parseInt(tokenValue))) {
-                        currentTick += parseInt(tokenValue) * ticksPerSample;
+                        currentTick = parseInt(tokenValue) * ticksPerSample;
+                        
+                        
                     }
                     break;
-                    case 'Program':
-                    if (!isPianoOnly) {
-                        let programNumber = parseInt(tokenValue);
-                        if (!isNaN(programNumber) && programNumber >= 0 && programNumber <= 127) {
-                            currentProgram = programNumber;
-                            track.addEvent(new midiWriterJs.ProgramChangeEvent({instrument: currentProgram}));
+                case 'Pitch':
+                    if (!isNaN(parseInt(tokenValue)) && tokenValue !== 'None') {
+                        if (index + 2 < tokenGroup.length) { // Ensure there are enough tokens following the Pitch token
+                            let velocityToken = tokenGroup[index + 1];
+                            let durationToken = tokenGroup[index + 2];
+                           
+                            if (velocityToken && durationToken) {
+                                let [velType, velValue] = velocityToken.split("_");
+                                let [durType, durValue] = durationToken.split("_");
+                                
+                                if (velType === 'Velocity' && durType === 'Duration' && !isNaN(parseInt(velValue)) && !isNaN(parseInt(durValue))) {
+                                    
+                                    let [beat, pos, res] = durValue.split('.').map(Number);
+                                    
+                                    let durationInTicks = (beat * res + pos) * timeDivision / res;
+                                    let duration = 'T' + durationInTicks.toString();
+                                    currentTick = currentTick + duration;
+
+                                    const noteEvent = new midiWriterJs.NoteEvent({
+                                        pitch: [tokenValue],
+                                        duration: duration,
+                                        velocity: parseInt(velValue),
+                                        tick: currentTick
+                                    });
+
+                                    track.addEvent([noteEvent], function(event, index) {
+                                        return {sequential: true};
+                                    });
+                                }
+                            }
                         }
                     }
                     break;
-                case 'Chord':
-                    chordNotes = []; // Initialize the chord array
-                    break;
-                case 'ChordEnd':
-                    // Create chord notes
-                    const chord = new midiWriterJs.NoteEvent({
-                        pitch: chordNotes,
-                        duration: currentDuration,
-                        velocity: currentVelocity,
-                        startTick: currentTick
-                    });
-                    track.addEvent(chord);
-                    chordNotes = []; // Clear the chord array for the next chord
+        
+                case 'Program':
+                    if (!isPianoOnly) {
+                        let programNumber = parseInt(tokenValue);
+                        console.log("program number: ", programNumber);
+                        if (!isNaN(programNumber) && programNumber >= 0 && programNumber <= 127) {
+                            currentProgram = programNumber;
+                            track.addEvent(new midiWriterJs.ProgramChangeEvent({ instrument: currentProgram }));
+                        }
+                        else if (programNumber === -1) {
+                            currentProgram = programNumber
+                            track.addEvent(new midiWriterJs.ProgramChangeEvent({ channel: 10 }));
+                            
+                        }
+                    }
                     break;
             }
         });
     });
 
-    // Convert the track to a MIDI file
-    let write = new midiWriterJs.Writer(track);
-    return write.buildFile();
+    let writer = new midiWriterJs.Writer(track);
+    return writer.buildFile();
 }
+
 
 
 
@@ -303,7 +300,7 @@ const write = async () => {
     if (maxValue < 1 || maxValue == null || maxValue == " ") return;
     const session = await ort.InferenceSession.create('models/musicgen2.onnx');
     const ctxSize = block_size;
-    const temperature = 1.0;
+    const temperature = 1.2;
     const topK = 100;
     
     while (true) {
@@ -351,7 +348,7 @@ const displayTokenByToken = (tokens) => {
         } else {
             clearInterval(intervalId);
         }
-    }, 50); // Adjust the interval time as needed
+    }, 1); // Adjust the interval time as needed
 }
 
 
@@ -371,7 +368,9 @@ document.getElementById('generateButton').addEventListener('click', async () => 
     }
 
     await write();
-    let ticksPerSample = 90;
+    let timeDivision = 384;
+    let ticksPerSample = timeDivision / 8;
+
     // const flatTokens = ['Position_0', 'Program_0', 'Pitch_42', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_66', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_69', 'Velocity_119', 'Duration_2.1.8', 'Program_0', 'Pitch_74', 'Velocity_119', 'Duration_2.1.8', 'Program_0', 'Pitch_78', 'Velocity_119', 'Duration_2.1.8', 'Program_-1', 'Pitch_36', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_4', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_0.5.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_6', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_66', 'Velocity_95', 'Duration_2.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_2.1.8', 'Program_-1', 'Pitch_40', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_12', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_16', 'Program_0', 'Pitch_45', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_66', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_95', 'Duration_1.1.8', 'Program_-1', 'Pitch_36', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_20', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_0.5.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_22', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_24', 'Program_0', 'Pitch_64', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_78', 'Velocity_119', 'Duration_1.1.8', 'Program_-1', 'Pitch_40', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_28', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_0.5.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_30', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Bar_None', 'Position_0', 'Program_0', 'Pitch_45', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_64', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_119', 'Duration_1.1.8', 'Program_0', 'Pitch_76', 'Velocity_119', 'Duration_1.1.8', 'Program_-1', 'Pitch_36', 'Velocity_95', 'Duration_0.2.8', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_4', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_6', 'Program_-1', 'Pitch_51', 'Velocity_95', 'Duration_0.2.8', 'Position_8', 'Program_0', 'Pitch_45', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_57', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_61', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_64', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_69', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_73', 'Velocity_95', 'Duration_1.1.8', 'Program_0', 'Pitch_76', 'Velocity_119', 'Duration_1.1.8', 'Program_-1', 'Pitch_40', 'Velocity_95']
     // const groupedTokens = [];
 
