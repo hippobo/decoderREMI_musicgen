@@ -230,7 +230,7 @@ function remiTokensToMidi(tokens, timeDivision, isPianoOnly) {
 const text = document.getElementById("text")
       const display = (token) => {
         globalContext.push(token);
-        text.innerHTML = globalContext
+        // text.innerHTML = globalContext
     
        
         
@@ -288,7 +288,9 @@ const generate = async (session, ctx, ctxSize, temperature, topK) => {
         ctx = decode([...idxs.slice(-ctxSize + 1), idx])
         
         
-        display(decode([idx]))
+        display(decode([idx]))  
+
+
 }
     
       
@@ -378,7 +380,7 @@ document.getElementById('generateButton').addEventListener('click', async () => 
     // const group = flatTokens.slice(i, i + 5);
     // groupedTokens.push(group);
 // }
-    displayTokenByToken(globalContext);
+    // displayTokenByToken(globalContext);
 
 //    let midiFile = remiTokensToMidi(groupedTokens, ticksPerSample);
    let midiFile = remiTokensToMidi([globalContext], ticksPerSample);
